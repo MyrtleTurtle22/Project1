@@ -1,12 +1,9 @@
 import osmnx as ox
 import json
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as PathEffects
 import networkx as nx
 from sklearn.metrics.pairwise import haversine_distances
 from math import radians
 import heapq
-import osmium as os
 
 class OpenList:
     def __init__(self):
@@ -63,31 +60,14 @@ g_score = {} # cost from start node to node n
 # get starting node from coordinates and add to open list
 nn = 2599168199
 dest_node = 310748125
-nn_lon = 0
-nn_lat = 0
-dest_lon = 0
-dest_lat = 0
-for i in nodes:
-    if i["node_id"] == nn:
-        nn_lon = i["lon"]
-        nn_lat = i["lat"]
-    else:
-        Exception
-for i in nodes:
-    if i["node_id"] == dest_node:
-        dest_lon = i["lon"]
-        dest_lat = i["lat"]
-    else:
-        Exception
 
-open_list.add_node(nn, calc_haversine_distance(nn_lat, nn_lon, dest_lat, dest_lon))
+open_list.add_node(nn, calc_haversine_distance(nodes.get(str(nn))[0], nodes.get(str(nn))[1], nodes.get(str(dest_node))[0], nodes.get(str(dest_node))[1]))
 g_score[nn] = 0
 # get destination node
 
 
 # get neighbors of current node
 while not open_list.isEmpty(): # if open list is empty and no solution is found, then fail
-    # sort open list by value
     # current is the lowest value in open_list
     current = open_list.remove_min()
     closed_list.append(current)
@@ -96,20 +76,19 @@ while not open_list.isEmpty(): # if open list is empty and no solution is found,
         route.reverse()
         print(route)
         # ox.plot_graph_route(G, route, route_color='r', route_linewidth=4, route_alpha=0.5)
-    neighbors = []
-    for i in nodes:
-        if i["node_id"] == current:
-            neighbors.append(i[neighbors])
+    neighbors = [nodes.get(current)]
     for n in neighbors:
         if n not in closed_list:
             # get lat/lon of current and each neighbor to calculate haversine distance
-            d_lat = G.nodes[dest_node]['y']
-            d_lon = G.nodes[dest_node]['x']
-            n_lat = G.nodes[n]['y']
-            n_lon = G.nodes[n]['x']
-            temp_h_score = calc_haversine_distance(d_lat, d_lon, n_lat, n_lon)
+            # d_lat = G.nodes[dest_node]['y']
+            # d_lon = G.nodes[dest_node]['x']
+            # n_lat = G.nodes[n]['y']
+            # n_lon = G.nodes[n]['x']
+
+
+            temp_h_score = calc_haversine_distance(dest_lat, dest_lon, n.values()[1], n.values()[2])
             # calculate cost function
-            temp_g_score = g_score[current] + G.edges[(current, n, 0)]["length"]/1000
+            temp_g_score = g_score[current] + n.values()[0]
             temp_f_score = temp_g_score + temp_h_score
             if not open_list.is_present(n):
                 open_list.add_node(n, temp_f_score)
