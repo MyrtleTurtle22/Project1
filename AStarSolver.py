@@ -1,39 +1,12 @@
-import osmnx as ox
+###### CURTIS DECKER #######
+
+
 import json
-import networkx as nx
 from sklearn.metrics.pairwise import haversine_distances
 from math import radians
-import heapq
+from open_list import OpenList as OL
+import sqlite3 as sl
 
-class OpenList:
-    def __init__(self):
-        self.open_list = {}
-        self.heap = []
-
-    def add_node(self, node_id, value):
-        self.open_list[node_id] = value
-        heapq.heappush(self.heap, (value, node_id))
-
-    def update_node(self, node_id, new_value):
-        self.open_list[node_id] = new_value
-        self.heap = [(val, nid) for val, nid in self.heap if nid != node_id]
-        heapq.heapify(self.heap)
-        heapq.heappush(self.heap, (new_value, node_id))
-
-    def remove_min(self):
-        if self.heap:
-            return heapq.heappop(self.heap)[1]
-        else:
-            return None
-        
-    def is_present(self, node_id):
-        return node_id in self.open_list
-
-    def get_value(self, node_id):
-        return self.open_list.get(node_id, None)
-    
-    def isEmpty(self):
-        return len(self.heap) == 0
     
 def calc_haversine_distance(start_y, start_x, dest_y, dest_x):
     starting_latlon = [start_y, start_x]
@@ -50,52 +23,92 @@ def make_path(came_from, current):
         total_path.append(current)
     return total_path
 
-nodes = json.loads("nodes.json")
-# G = ox.graph_from_place('Bronx', network_type='drive')
-# create open list and closed list, initialize g-score
-open_list = OpenList()
-closed_list = []
-came_from = {}
-g_score = {} # cost from start node to node n
-# get starting node from coordinates and add to open list
-nn = 2599168199
-dest_node = 310748125
+def AStarSolver(start_node, dest_node, verbosity = 0):
+    # Pseudocode for algorithm found here, although I modified it significantly
+    # Section 3.2
+    # https://www.mdpi.com/1999-4893/13/12/308
 
-open_list.add_node(nn, calc_haversine_distance(nodes.get(str(nn))[0], nodes.get(str(nn))[1], nodes.get(str(dest_node))[0], nodes.get(str(dest_node))[1]))
-g_score[nn] = 0
-# get destination node
+    # connect to DB to access node data
+    conn = sl.connect('nodes.db')
+    cursor = conn.cursor()
+    
+    # create open list and closed list, initialize g-score
+    open_list = OL()
+    closed_list = []
+    came_from = {} # tracks the currently followed path
+    g_score = {} # cost from start node to node n
+    
+    # get lat/lon of starting node
+    query = cursor.execute("SELECT * FROM locations WHERE id = ?", (start_node,))
+    sn_row = query.fetchone()
+    sn_lat = sn_row[1]
+    sn_lon = sn_row[2]
+    
+    # get lat/lon of destination node
+    query = cursor.execute("SELECT * FROM locations WHERE id = ?", (dest_node,))
+    dest_row = query.fetchone()
+    dest_lat = dest_row[1]
+    dest_lon = dest_row[2]
+    
+    # add starting node to open list
+    open_list.add_node(start_node, calc_haversine_distance(sn_lat, sn_lon, dest_lat, dest_lon))
+    g_score[start_node] = 0
+
+    # get neighbors of current node
+    while not open_list.isEmpty(): # if open list is empty and no solution is found, then fail
+
+        if verbosity > 0:
+            print("CLOSED LIST")
+            print(closed_list)
+            print("OPEN LIST")
+            print(OL.__str__())
+            print("CURRENT PATH")
+            print(make_path(came_from, current))
 
 
-# get neighbors of current node
-while not open_list.isEmpty(): # if open list is empty and no solution is found, then fail
-    # current is the lowest value in open_list
-    current = open_list.remove_min()
-    closed_list.append(current)
-    if current == dest_node:
-        route = make_path(came_from, dest_node)
-        route.reverse()
-        print(route)
-        # ox.plot_graph_route(G, route, route_color='r', route_linewidth=4, route_alpha=0.5)
-    neighbors = [nodes.get(current)]
-    for n in neighbors:
-        if n not in closed_list:
-            # get lat/lon of current and each neighbor to calculate haversine distance
-            # d_lat = G.nodes[dest_node]['y']
-            # d_lon = G.nodes[dest_node]['x']
-            # n_lat = G.nodes[n]['y']
-            # n_lon = G.nodes[n]['x']
+        # remove min value from open list, Step 2
+        current = open_list.remove_min() 
+        closed_list.append(current)
 
+        # if current is destination, then terminate, Step 3
+        if current == dest_node:
+            route = make_path(came_from, dest_node)
+            route.reverse()
+            conn.close()
+            return route
 
-            temp_h_score = calc_haversine_distance(dest_lat, dest_lon, n.values()[1], n.values()[2])
-            # calculate cost function
-            temp_g_score = g_score[current] + n.values()[0]
-            temp_f_score = temp_g_score + temp_h_score
-            if not open_list.is_present(n):
-                open_list.add_node(n, temp_f_score)
-                came_from[n] = current
-                g_score[n] = temp_g_score
+        # get neighbor nodes of current node    
+        children = cursor.execute("SELECT children FROM locations WHERE id = ?", (current,))
+        children = children.fetchone()
+        children = children[0]
+        neighbors = json.loads(children)
 
-            elif temp_f_score < open_list.get_value(n):
-                open_list.update_node(n, temp_f_score)
-                came_from[n] = current
-                g_score[n] = temp_g_score
+        # iterate through nodes, calculating f-score of each
+        for n in neighbors.keys():
+            if n not in closed_list:
+
+                # get lat/lon of neighbor to calculate haversine distance
+                neighbor = cursor.execute("SELECT * FROM locations WHERE id = ?", (n,))
+                neighbor = neighbor.fetchone()
+                n_lat = neighbor[1]
+                n_lon = neighbor[2]
+                temp_h_score = calc_haversine_distance(dest_lat, dest_lon, n_lat, n_lon)
+
+                # calculate cost function, Step 4
+                temp_g_score = g_score[current] + neighbors.get(n)
+                temp_f_score = temp_g_score + temp_h_score
+
+                # if neighbor is not on open list, add it, Step 5
+                if not open_list.is_present(int(n)):
+                    open_list.add_node(int(n), temp_f_score)
+                    came_from[int(n)] = current
+                    g_score[int(n)] = temp_g_score
+
+                # if neighbor is on open list but new f-score is lower, update it, Step 6
+                elif temp_f_score < open_list.get_value(int(n)):
+                    open_list.update_node(int(n), temp_f_score)
+                    came_from[int(n)] = current
+                    g_score[int(n)] = temp_g_score
+    conn.close()
+    # if open list is empty before destination node is found, then no route is possible
+    return "FAIL"
