@@ -53,19 +53,37 @@ def make_path(came_from, current):
         total_path.append(current)
     return total_path
 
-# nodes = json.loads(nodes.json)
-G = ox.graph_from_place('Bronx', network_type='drive')
+nodes = json.loads("nodes.json")
+# G = ox.graph_from_place('Bronx', network_type='drive')
 # create open list and closed list, initialize g-score
 open_list = OpenList()
 closed_list = []
 came_from = {}
 g_score = {} # cost from start node to node n
 # get starting node from coordinates and add to open list
-nn = ox.distance.nearest_nodes(G, -73.8476, 40.8982)
-open_list.add_node(nn, calc_haversine_distance(40.8982, -73.8476, 40.82078, -73.92956))
+nn = 2599168199
+dest_node = 310748125
+nn_lon = 0
+nn_lat = 0
+dest_lon = 0
+dest_lat = 0
+for i in nodes:
+    if i["node_id"] == nn:
+        nn_lon = i["lon"]
+        nn_lat = i["lat"]
+    else:
+        Exception
+for i in nodes:
+    if i["node_id"] == dest_node:
+        dest_lon = i["lon"]
+        dest_lat = i["lat"]
+    else:
+        Exception
+
+open_list.add_node(nn, calc_haversine_distance(nn_lat, nn_lon, dest_lat, dest_lon))
 g_score[nn] = 0
 # get destination node
-dest_node = ox.distance.nearest_nodes(G, -73.92956, 40.82078)
+
 
 # get neighbors of current node
 while not open_list.isEmpty(): # if open list is empty and no solution is found, then fail
@@ -76,8 +94,12 @@ while not open_list.isEmpty(): # if open list is empty and no solution is found,
     if current == dest_node:
         route = make_path(came_from, dest_node)
         route.reverse()
-        ox.plot_graph_route(G, route, route_color='r', route_linewidth=4, route_alpha=0.5)
-    neighbors = list(G.neighbors(current))
+        print(route)
+        # ox.plot_graph_route(G, route, route_color='r', route_linewidth=4, route_alpha=0.5)
+    neighbors = []
+    for i in nodes:
+        if i["node_id"] == current:
+            neighbors.append(i[neighbors])
     for n in neighbors:
         if n not in closed_list:
             # get lat/lon of current and each neighbor to calculate haversine distance
