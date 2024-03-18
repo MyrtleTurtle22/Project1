@@ -73,7 +73,8 @@ class Queue:
             if node.get_id() == node_id:
                 return node
     
-    def get_node_ids(self):
+    def get_node_ids(self) -> List[str]:
+        print([node.get_id() for node in self.nodes])
         return [node.get_id() for node in self.nodes]
     
     def isEmpty(self):

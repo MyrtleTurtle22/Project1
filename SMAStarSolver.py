@@ -62,7 +62,7 @@ def get_solution(queue: Queue, goal_node: str, root_node: str, solution: Queue):
     else:
         goal_node = queue.get_node(goal_node)
         solution.add_node(goal_node.get_parent())
-        get_solution(queue, goal_node.get_parent().get_id(), root_node, solution)
+        return get_solution(queue, goal_node.get_parent().get_id(), root_node, solution)
 
 def MSA(root_node_id: str, goal_node_id: str) -> bool:
     """Runs solution and returns true if solution was found and
@@ -180,7 +180,7 @@ def MSA(root_node_id: str, goal_node_id: str) -> bool:
 
 
 def main():
-    solution = MSA("310748060", "314662007")
+    solution = MSA("310748060", "310748062")
     print(solution)
 
 if __name__ == "__main__":
